@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"math/rand"
+	"strconv"
 	"time"
 )
 
@@ -29,7 +30,7 @@ func (g *Game) randomOperation() int {
 }
 
 func (g *Game) CurrentQuestion() string {
-	return g.question
+	return g.question + " = ?"
 }
 
 func (g *Game) generateQuestion() string {
@@ -47,6 +48,9 @@ func (g *Game) generateQuestion() string {
 		g.answer = l - r
 		g.operString = "-"
 	case Dev:
+		if r == 0 {
+			r++
+		}
 		g.answer = l / r
 		g.operString = "/"
 	case Multiply:
@@ -58,14 +62,12 @@ func (g *Game) generateQuestion() string {
 	return g.question
 }
 
-func (g *Game) NextQuestion(ch chan<- string) {
+func (g *Game) Answer() string {
+	return strconv.Itoa(g.answer)
+}
 
-	if g.currentQuestion() != "" {
-		ch <- "Генерируем новый вопрос..."
-		time.Sleep(3 * time.Second)
-	}
-	ch <- g.generateQuestion()
-
+func (g *Game) NextQuestion() string {
+	return g.generateQuestion() + " = ?"
 }
 
 func (g *Game) currentQuestion() string {

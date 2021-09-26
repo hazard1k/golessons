@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"time"
 )
 
 type client chan<- string
@@ -18,7 +19,7 @@ var (
 )
 
 func main() {
-	listener, err := net.Listen("tcp", "localhost:8000")
+	listener, err := net.Listen("tcp", ":8000")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -62,11 +63,12 @@ func handleConn(conn net.Conn, g *game.Game) {
 		in := input.Text()
 		messages <- who + ": " + in
 
-		if a, err := strconv.Atoi(in); err == nil {
-			if g.IsAnswerCorrect(a) {
-				messages <- who + "is a winner!"
-				g.NextQuestion(messages)
-			}
+		if a, err := strconv.Atoi(in); err == nil && g.IsAnswerCorrect(a) {
+			messages <- "правильный ответ: " + g.Answer()
+			messages <- who + " is a winner!"
+			ch <- "Генерируем новый вопрос..."
+			time.Sleep(3 * time.Second)
+			messages <- g.NextQuestion()
 		}
 	}
 
