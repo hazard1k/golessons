@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"log"
@@ -9,6 +10,14 @@ import (
 	"os/signal"
 	"sync"
 	"time"
+)
+
+type client chan<- string
+
+var (
+	entering = make(chan client)
+	leaving  = make(chan client)
+	srvCh    = make(chan string)
 )
 
 func main() {
@@ -21,6 +30,16 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	go broadcaster()
+
+	go func() {
+		input := bufio.NewScanner(os.Stdin)
+		for input.Scan() {
+			srvCh <- input.Text()
+		}
+	}()
+
 	wg := &sync.WaitGroup{}
 	log.Println("im started!")
 
@@ -52,6 +71,10 @@ func main() {
 func handleConn(ctx context.Context, conn net.Conn, wg *sync.WaitGroup) {
 	defer wg.Done()
 	defer conn.Close()
+	ch := make(chan string)
+	entering <- ch
+
+	go clientWriter(conn, ch)
 	// каждую 1 секунду отправлять клиентам текущее время сервера
 	tck := time.NewTicker(time.Second)
 	for {
@@ -61,5 +84,30 @@ func handleConn(ctx context.Context, conn net.Conn, wg *sync.WaitGroup) {
 		case t := <-tck.C:
 			fmt.Fprintf(conn, "now: %s\n", t)
 		}
+	}
+	leaving <- ch
+	close(ch)
+}
+
+func broadcaster() {
+	clients := make(map[client]bool)
+	for {
+		select {
+		case msg := <-srvCh:
+			for cli := range clients {
+				cli <- msg
+			}
+		case cli := <-entering:
+			clients[cli] = true
+
+		case cli := <-leaving:
+			delete(clients, cli)
+		}
+	}
+}
+
+func clientWriter(conn net.Conn, ch <-chan string) {
+	for msg := range ch {
+		fmt.Fprintln(conn, msg)
 	}
 }
